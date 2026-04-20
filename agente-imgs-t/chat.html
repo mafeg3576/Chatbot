@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMGS-T Advisor - Consultor de Sostenibilidad</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: white;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #0d3b4a 0%, #1a5f7a 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .chat-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .chat-header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .empresa-id-area {
+            background: #f0f2f5;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        .empresa-id-area label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .empresa-id-area input {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            width: 120px;
+            font-size: 1rem;
+        }
+
+        .empresa-id-area button {
+            background: #1a5f7a;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .empresa-id-area button:hover {
+            background: #0d3b4a;
+        }
+
+        .empresa-id-area .info {
+            font-size: 0.85rem;
+            color: #666;
+            margin-left: auto;
+        }
+
+        .clear-btn {
+            background: none;
+            border: 1px solid #ccc;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .clear-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f7fa;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 80%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .bot-message {
+            align-self: flex-start;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .user-avatar {
+            background: #1a5f7a;
+            color: white;
+        }
+
+        .bot-avatar {
+            background: #e0e7ff;
+            color: #1a5f7a;
+        }
+
+        .bubble {
+            background: white;
+            padding: 12px 18px;
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .user-message .bubble {
+            background: #1a5f7a;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot-message .bubble {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+
+        .bubble p {
+            margin-bottom: 8px;
+        }
+
+        .bubble ul, .bubble ol {
+            margin: 8px 0 8px 20px;
+        }
+
+        .bubble li {
+            margin: 4px 0;
+        }
+
+        .options-area {
+            background: #f9f9f9;
+            padding: 12px 20px;
+            display: flex;
+            gap: 15px;
+            border-top: 1px solid #e0e0e0;
+            justify-content: center;
+        }
+
+        .option-btn {
+            background: #e0e7ff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #1a5f7a;
+            transition: all 0.2s;
+        }
+
+        .option-btn:hover {
+            background: #1a5f7a;
+            color: white;
+        }
+
+        .input-area {
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            padding: 20px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px 18px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .input-area input:focus {
+            border-color: #1a5f7a;
+        }
+
+        .input-area button {
+            background: #1a5f7a;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .input-area button:hover {
+            background: #0d3b4a;
+        }
+
+        .input-area button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 5px;
+            padding: 12px 18px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="logo">🌱</div>
+            <div>
+                <h1>Bienvenido a tu agente personal</h1>
+                <p>Consultor experto en sostenibilidad para PyMEs textiles colombianas</p>
+            </div>
+        </div>
+
+        <div class="empresa-id-area">
+            <label>ID de la empresa :</label>
+            <input type="number" id="empresaIdInput" placeholder="Ej: 2" min="1" max="1000" value="2">
+            <button id="setEmpresaBtn">Establecer ID</button>
+            <div class="info" id="empresaInfo">ID actual: no establecido</div>
+            <button class="clear-btn" onclick="limpiarConversacion()">Limpiar conversación</button>
+        </div>
+
+        <div class="messages-area" id="messagesArea">
+            <div class="message bot-message">
+                <div class="avatar bot-avatar">🤖</div>
+                <div class="bubble">
+                    ¡Hola! Soy el consultor Sostenible .<br><br>
+                    Para comenzar, ingresa el ID de tu empresa y haz clic en "Establecer ID".
+                </div>
+            </div>
+        </div>
+
+        <!-- Área de opciones que se muestra solo cuando hay ID establecido -->
+        <div class="options-area" id="optionsArea" style="display: none;">
+            <button class="option-btn" id="analizarBtn">📊 Ver análisis completo de mi evaluación IMGS-T</button>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Escribe tu pregunta aquí..." onkeypress="handleKeyPress(event)">
+            <button id="sendBtn" onclick="enviarMensaje()" disabled>Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        let organizacionId = null;
+        let historial = [];
+
+        const empresaIdInput = document.getElementById('empresaIdInput');
+        const setEmpresaBtn = document.getElementById('setEmpresaBtn');
+        const empresaInfo = document.getElementById('empresaInfo');
+        const sendBtn = document.getElementById('sendBtn');
+        const messageInput = document.getElementById('messageInput');
+        const optionsArea = document.getElementById('optionsArea');
+        const analizarBtn = document.getElementById('analizarBtn');
+
+        // Limitar input numérico a 1-1000
+        empresaIdInput.addEventListener('input', function() {
+            let val = parseInt(this.value);
+            if (isNaN(val)) {
+                this.value = '';
+                return;
+            }
+            if (val < 1) this.value = 1;
+            if (val > 1000) this.value = 1000;
+        });
+
+        function actualizarEstadoBoton() {
+            sendBtn.disabled = (organizacionId === null);
+        }
+
+        function setEmpresaId() {
+            let id = parseInt(empresaIdInput.value);
+            if (isNaN(id) || id < 1 || id > 1000) {
+                alert('Por favor ingresa un ID de empresa válido (número entre 1 y 1000)');
+                return;
+            }
+            organizacionId = id;
+            empresaInfo.textContent = `ID actual: ${organizacionId}`;
+            actualizarEstadoBoton();
+            // Mostrar el área de opciones
+            optionsArea.style.display = 'flex';
+            // Mensaje de confirmación
+            agregarMensaje(`ID de empresa establecido ${organizacionId}. ¿Qué deseas hacer?`, 'bot');
+        }
+
+        setEmpresaBtn.addEventListener('click', setEmpresaId);
+
+        // Acción del botón "Ver análisis"
+        analizarBtn.addEventListener('click', () => {
+            if (organizacionId === null) return;
+            const mensajeAnalisis = `Por favor, realiza un análisis completo de mi empresa usando el ID ${organizacionId}. Necesito el diagnóstico inicial con brechas y recomendaciones.`;
+            enviarMensajePersonalizado(mensajeAnalisis);
+        });
+
+        async function enviarMensajePersonalizado(mensaje) {
+            if (!mensaje.trim()) return;
+            agregarMensaje(mensaje, 'user');
+            sendBtn.disabled = true;
+            mostrarTyping();
+
+            try {
+                const response = await fetch('/api/agente/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        organizacion_id: organizacionId,
+                        mensaje: mensaje,
+                        historial: historial
+                    })
+                });
+                const data = await response.json();
+                ocultarTyping();
+                historial = data.historial;
+                agregarMensaje(data.respuesta, 'bot');
+            } catch (error) {
+                ocultarTyping();
+                agregarMensaje('⚠️ Error de conexión. Por favor, intenta de nuevo.', 'bot');
+            }
+            sendBtn.disabled = false;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                enviarMensaje();
+            }
+        }
+
+        async function enviarMensaje() {
+            if (organizacionId === null) {
+                alert('Primero debes establecer el ID de la empresa');
+                return;
+            }
+
+            const mensaje = messageInput.value.trim();
+            if (!mensaje) return;
+
+            agregarMensaje(mensaje, 'user');
+            messageInput.value = '';
+            sendBtn.disabled = true;
+            mostrarTyping();
+
+            try {
+                const response = await fetch('/api/agente/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        organizacion_id: organizacionId,
+                        mensaje: mensaje,
+                        historial: historial
+                    })
+                });
+
+                const data = await response.json();
+                ocultarTyping();
+                historial = data.historial;
+                agregarMensaje(data.respuesta, 'bot');
+            } catch (error) {
+                ocultarTyping();
+                agregarMensaje('⚠️ Error de conexión. Por favor, intenta de nuevo.', 'bot');
+            }
+
+            sendBtn.disabled = false;
+        }
+
+        function agregarMensaje(texto, tipo) {
+            const messagesArea = document.getElementById('messagesArea');
+            const div = document.createElement('div');
+            div.className = `message ${tipo === 'user' ? 'user-message' : 'bot-message'}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${tipo === 'user' ? 'user-avatar' : 'bot-avatar'}`;
+            avatar.textContent = tipo === 'user' ? '👤' : '🤖';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerHTML = formatoTexto(texto);
+            
+            div.appendChild(avatar);
+            div.appendChild(bubble);
+            messagesArea.appendChild(div);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function formatoTexto(texto) {
+            let html = texto.replace(/\n/g, '<br>');
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/^- (.*?)(<br>|$)/gm, '<li>$1</li>');
+            if (html.includes('<li>')) {
+                html = html.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
+            }
+            return html;
+        }
+
+        function mostrarTyping() {
+            const messagesArea = document.getElementById('messagesArea');
+            const div = document.createElement('div');
+            div.id = 'typingIndicator';
+            div.className = 'message bot-message';
+            div.innerHTML = `
+                <div class="avatar bot-avatar">🤖</div>
+                <div class="bubble">
+                    <div class="typing-indicator"><span></span><span></span><span></span></div>
+                </div>
+            `;
+            messagesArea.appendChild(div);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function ocultarTyping() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        // ✅ Función limpiarConversacion MEJORADA: también borra el ID
+        function limpiarConversacion() {
+            // 1. Limpiar historial de mensajes
+            historial = [];
+            
+            // 2. Reiniciar el ID de la empresa
+            organizacionId = null;
+            empresaInfo.textContent = 'ID actual: no establecido';
+            empresaIdInput.value = 2;   // valor por defecto
+            actualizarEstadoBoton();     // deshabilita el botón de enviar
+            
+            // 3. Ocultar el botón de análisis
+            optionsArea.style.display = 'none';
+            
+            // 4. Mostrar mensaje de reinicio
+            const messagesArea = document.getElementById('messagesArea');
+            messagesArea.innerHTML = `
+                <div class="message bot-message">
+                    <div class="avatar bot-avatar">🤖</div>
+                    <div class="bubble">
+                        Conversación reiniciada.<br><br>
+                        El ID de la empresa ha sido borrado.<br>
+                        Por favor, ingresa un nuevo ID haz clic en "Establecer ID".
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
