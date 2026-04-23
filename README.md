@@ -5,7 +5,10 @@
 
 ## 📌 Descripción
 
-Este proyecto consiste en el desarrollo de un **chatbot inteligente basado en inteligencia artificial**, capaz de generar respuestas en tiempo real a partir de las consultas de los usuarios.
+Este proyecto consiste en el desarrollo de un chatbot inteligente, capaz de generar respuestas en tiempo real a partir de las consultas realizadas por las empresas.
+
+El sistema permite analizar y validar los resultados de la prueba IMGS-T, así como responder dudas relacionadas con las recomendaciones obtenidas, con el fin de apoyar la toma de decisiones y la mejora de la sostenibilidad en el sector textil.
+
 
 El sistema implementa una **arquitectura cliente-servidor**, donde:
 
