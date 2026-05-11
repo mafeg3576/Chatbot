@@ -7,6 +7,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.supabase_client import supabase
 from knowledge.recomendaciones import BASE_CONOCIMIENTO
 
+# Si deseas un cliente específico para indicadores (opcional, ya tenemos supabase)
+# from supabase import create_client
+# supabase_client = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+
 def ejecutar_tool(nombre: str, inputs: Dict[str, Any]) -> str:
     if nombre == "obtener_diagnostico_completo":
         return _obtener_diagnostico_completo(inputs)
@@ -16,6 +20,8 @@ def ejecutar_tool(nombre: str, inputs: Dict[str, Any]) -> str:
         return _identificar_brechas(inputs)
     elif nombre == "guardar_plan_accion":
         return _guardar_plan_accion(inputs)
+    elif nombre == "sugerir_indicadores":           # NUEVA TOOL
+        return _sugerir_indicadores(inputs)
     else:
         return f"Herramienta '{nombre}' no reconocida."
 
@@ -147,3 +153,46 @@ def _guardar_plan_accion(inputs: Dict[str, Any]) -> str:
         return "Plan de accion guardado correctamente."
     except Exception as e:
         return f"Error al guardar: {e}"
+
+# ========== TOOL 5: SUGERIR INDICADORES ==========
+def _sugerir_indicadores(inputs: Dict[str, Any]) -> str:
+    dimension = inputs.get('dimension')
+    nivel_actual = inputs.get('nivel_actual')
+    solo_gestion = inputs.get('solo_gestion', True)
+
+    if not dimension or not nivel_actual:
+        return "Faltan parámetros: dimension y nivel_actual"
+
+    # El catálogo solo cubre D2, D3 y D4
+    if dimension not in ['D2', 'D3', 'D4']:
+        return f"El catálogo de indicadores solo cubre D2, D3 y D4. Para {dimension} usa tu conocimiento general."
+
+    try:
+        # Construir la consulta usando el cliente supabase existente
+        query = supabase.table('indicadores_sostenibilidad') \
+            .select('indicador_nombre, subindicador, forma_medicion, ejemplo') \
+            .eq('dimension', dimension) \
+            .lte('nivel_minimo', nivel_actual)
+
+        if solo_gestion:
+            query = query.eq('tipo_indicador', 'Gestión')
+
+        result = query.order('indicador_nombre').execute()
+
+        if not result.data:
+            return f"No se encontraron indicadores de gestión para {dimension} nivel ≤ {nivel_actual}."
+
+        # Formatear respuesta
+        respuesta = f"Indicadores de gestión para {dimension} (nivel ≤ {nivel_actual}):\n\n"
+        indicador_actual = ""
+        for row in result.data:
+            if row['indicador_nombre'] != indicador_actual:
+                indicador_actual = row['indicador_nombre']
+                respuesta += f"## {indicador_actual}\n"
+            respuesta += f"- Subindicador: {row['subindicador']}\n"
+            respuesta += f"  Medición: {row['forma_medicion']}\n"
+            respuesta += f"  Ejemplo: {row['ejemplo']}\n\n"
+        return respuesta
+
+    except Exception as e:
+        return f"Error al consultar indicadores: {str(e)}"

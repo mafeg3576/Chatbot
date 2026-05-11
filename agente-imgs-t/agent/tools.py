@@ -63,5 +63,33 @@ TOOLS = [
             },
             "required": ["organizacion_id", "plan"]
         }
+    },  
+    {
+        "name": "sugerir_indicadores",
+        "description": """Consulta el catálogo especializado de indicadores de sostenibilidad construido por Ingeniería Industrial.
+
+Recupera subindicadores concretos y medibles según la dimensión del IMGS-T y el nivel de madurez actual de la organización.
+
+Úsala cuando necesites sugerir indicadores específicos que la PyME debería empezar a medir para avanzar al siguiente nivel.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "dimension": {
+                    "type": "string",
+                    "enum": ["D1", "D2", "D3", "D4"],
+                    "description": "Dimensión del IMGS-T a consultar"
+                },
+                "nivel_actual": {
+                    "type": "integer",
+                    "description": "Nivel de madurez actual de la dimensión (1-5)"
+                },
+                "solo_gestion": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Si es true, retorna solo indicadores de Gestión"
+                }
+            },
+            "required": ["dimension", "nivel_actual"]
+        }
     }
 ]
