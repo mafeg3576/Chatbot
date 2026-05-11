@@ -1,27 +1,326 @@
 # agent/agent.py
+import logging
+import os
+import re
+from datetime import datetime
+from typing import Any, Dict, List, Tuple
 
 import anthropic
-import os
-import logging
-from typing import Tuple, List, Dict, Any
-from datetime import datetime
 
-from .tools import TOOLS
-from .tool_executor import ejecutar_tool
 from .prompts import SYSTEM_PROMPT
+from .tool_executor import ejecutar_tool
+from .tools import TOOLS
 
-# Configurar logging para debug y monitoreo (sin emojis)
+# ==========================
+# Configuración y constantes
+# ==========================
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Inicializa el cliente de Anthropic
+# Cliente de Anthropic
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-# Constantes
+# Constantes de comportamiento
 MAX_TURNOS = 10
 MAX_TOKENS = 4096
 MODELO = "claude-sonnet-4-6"
-MAX_HISTORIAL_MENSAJES = 20  # Limitar historial para no exceder tokens
+MAX_HISTORIAL_MENSAJES = 20
+
+# Caché del diagnóstico
+diagnostico_cache = {}
+
+# ==========================
+# Funciones auxiliares
+# ==========================
+
+def _extraer_texto_respuesta(content: List[Any]) -> str:
+    """Extrae el texto plano de la respuesta de Claude."""
+    texto = ""
+    for bloque in content:
+        if hasattr(bloque, 'text') and bloque.text:
+            texto += bloque.text
+        elif hasattr(bloque, 'type') and bloque.type == "text" and hasattr(bloque, 'text'):
+            texto += bloque.text
+    return texto.strip()
+
+
+def limpiar_historial(historial: List[Dict[str, Any]], max_mensajes: int = 20) -> List[Dict[str, Any]]:
+    """Mantiene solo los primeros y últimos mensajes para no exceder el límite."""
+    if len(historial) <= max_mensajes:
+        return historial
+    primeros = historial[:4]
+    ultimos = historial[-(max_mensajes - 4):]
+    return primeros + ultimos
+
+
+def obtener_diagnostico_cache(org_id: str) -> str:
+    """Obtiene el diagnóstico desde caché o consultando Supabase."""
+    org_id_str = str(org_id)
+    if org_id_str not in diagnostico_cache:
+        logger.info(f"Consultando diagnóstico para {org_id_str}...")
+        resultado = ejecutar_tool("obtener_diagnostico_completo", {"organizacion_id": org_id_str})
+        if resultado and "No se encontró" not in resultado and "Error" not in resultado:
+            diagnostico_cache[org_id_str] = resultado
+        else:
+            return None
+    return diagnostico_cache[org_id_str]
+
+
+def extraer_nivel_dimension(diagnostico_texto: str, dimension: str) -> int:
+    """Extrae el nivel de madurez de una dimensión (ej: D4) desde el texto del diagnóstico."""
+    if not diagnostico_texto:
+        return None
+    patron = rf'- {dimension}.*?:\s*([\d\.]+)'
+    match = re.search(patron, diagnostico_texto)
+    if match:
+        puntaje = float(match.group(1).replace(',', '.'))
+        if puntaje <= 1.0:
+            return 1
+        elif puntaje <= 2.0:
+            return 2
+        elif puntaje <= 3.0:
+            return 3
+        elif puntaje <= 4.0:
+            return 4
+        else:
+            return 5
+    return None
+
+
+def generar_respuesta_ia(tipo_respuesta: str, diagnostico_texto: str) -> str:
+    """
+    Genera respuestas usando IA real (Claude) según el diagnóstico.
+    Tipos soportados: "resumen", "analisis", "recomendaciones".
+    """
+    prompts = {
+        "resumen": f"""
+Eres un consultor senior en sostenibilidad textil. Analiza este diagnóstico y genera un RESUMEN EJECUTIVO.
+OBJETIVO:
+- Explicar el nivel de madurez
+- Explicar qué significa operativamente
+- Interpretar competitividad, eficiencia y riesgos
+- Dar una lectura estratégica real
+
+REGLAS:
+- Máximo 180 palabras
+- Profesional, claro, analítico
+- No repetir datos literalmente
+- NO usar emojis
+- NO usar tablas
+
+DIAGNÓSTICO:
+{diagnostico_texto}
+""",
+        "analisis": f"""
+Eres un consultor senior especializado en sostenibilidad para PyMEs textiles. Analiza el diagnóstico.
+
+CLASIFICA OBLIGATORIAMENTE:
+1. Fortalezas (>=4.0)
+2. Áreas de mejora (3.0-3.9)
+3. Brechas críticas (<3.0)
+
+IMPORTANTE:
+- Nunca pongas algo menor a 4.0 como fortaleza
+- Explica impacto real: costos, eficiencia, cumplimiento, competitividad
+- Explica qué pasa si no mejoran
+
+FORMATO:
+ANALISIS DE DIAGNOSTICO
+Fortalezas: ...
+Áreas de mejora: ...
+Brechas críticas: ...
+Conclusión: ...
+
+NO usar emojis. NO usar tablas.
+
+DIAGNÓSTICO:
+{diagnostico_texto}
+""",
+        "recomendaciones": f"""
+Eres un consultor senior en sostenibilidad textil colombiana. Genera máximo 4 recomendaciones ESTRATÉGICAS y PERSONALIZADAS según el diagnóstico.
+
+Cada recomendación debe incluir:
+- Qué hacer
+- Por qué es importante
+- Cómo empezar
+- Impacto esperado
+- Costo estimado en COP
+- Plazo
+
+REGLAS:
+- Nada genérico
+- Debe sentirse consultoría real
+- Priorizar quick wins
+- Priorizar sostenibilidad real
+- Relacionar recomendaciones con las dimensiones débiles
+
+FORMATO:
+RECOMENDACIONES PRIORITARIAS
+1. ...
+   Por qué:
+   Cómo empezar:
+   Impacto:
+   Costo:
+   Plazo:
+
+NO usar emojis. NO usar tablas.
+
+DIAGNÓSTICO:
+{diagnostico_texto}
+"""
+    }
+
+    try:
+        response = client.messages.create(
+            model=MODELO,
+            max_tokens=1200,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompts[tipo_respuesta]}]
+        )
+        return _extraer_texto_respuesta(response.content)
+    except Exception as e:
+        logger.error(f"Error generando respuesta IA: {e}")
+        return "Error generando análisis inteligente."
+
+
+def verificar_estado_agente() -> Dict[str, Any]:
+    """Función auxiliar para debugging: muestra el estado del agente."""
+    return {
+        "modelo": MODELO,
+        "tools_count": len(TOOLS),
+        "anthropic_key_configured": bool(os.getenv("ANTHROPIC_API_KEY")),
+        "system_prompt_length": len(SYSTEM_PROMPT)
+    }
+
+
+# ==========================
+# Funciones principales del agente
+# ==========================
+
+def manejar_opcion_numerica(org_id: str, opcion: str, historial: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
+    """Maneja las opciones 1 a 5 del menú principal."""
+    diagnostico = obtener_diagnostico_cache(org_id)
+    if not diagnostico:
+        return "No se pudo obtener el diagnóstico. Verifica el ID.", historial
+
+    if opcion == '1':
+        respuesta = generar_respuesta_ia("resumen", diagnostico)
+    elif opcion == '2':
+        respuesta = generar_respuesta_ia("analisis", diagnostico)
+    elif opcion == '3':
+        respuesta = generar_respuesta_ia("recomendaciones", diagnostico)
+    elif opcion == '4':
+        respuesta = (
+            "Elige la dimensión para ver indicadores y recomendaciones específicas:\n"
+            "2. D2 - Dimensión Económica\n"
+            "3. D3 - Dimensión Social\n"
+            "4. D4 - Dimensión Ambiental"
+        )
+        historial = historial + [{'role': 'assistant', 'content': respuesta}]
+        return respuesta, historial
+    elif opcion == '5' or opcion.lower() == 'salir':
+        respuesta = "Sesión finalizada. Gracias por usar IMGS-T Advisor. Para comenzar de nuevo, establece un ID de empresa."
+        return respuesta, []
+    else:
+        respuesta = "Opción no válida. Elige 1,2,3,4 o 5."
+
+    # Añadir menú principal al final (excepto si es la opción 4 que ya tiene su propio submenú)
+    if opcion in ('1', '2', '3', '5'):
+        respuesta += "\n\n¿Qué deseas hacer ahora?\n1. Resumen\n2. Análisis\n3. Recomendaciones generales\n4. Indicadores y recomendaciones específicas\n5. Salir"
+
+    historial = historial + [{'role': 'assistant', 'content': respuesta}]
+    return respuesta, historial
+
+
+def manejar_indicadores_por_dimension(org_id: str, dimension: str, historial: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
+    """Opción 4: entrega recomendaciones específicas + indicadores para D2, D3 o D4."""
+    diagnostico = obtener_diagnostico_cache(org_id)
+    if not diagnostico:
+        return "No se pudo obtener el diagnóstico.", historial
+
+    nivel = extraer_nivel_dimension(diagnostico, dimension)
+    if nivel is None:
+        respuesta = f"No tengo el nivel actual para {dimension}. ¿Cuál es tu nivel (1 a 5)?"
+        historial = historial + [{'role': 'assistant', 'content': respuesta, 'esperando_nivel': True, 'dim_indicador': dimension}]
+        return respuesta, historial
+
+    # Obtener recomendaciones e indicadores
+    resultado_recomendaciones = ejecutar_tool('buscar_recomendaciones', {'dimension': dimension, 'nivel_actual': nivel})
+    resultado_indicadores = ejecutar_tool('sugerir_indicadores', {'dimension': dimension, 'nivel_actual': nivel, 'solo_gestion': True})
+
+    respuesta = f"RECOMENDACIONES ESPECÍFICAS E INDICADORES PARA {dimension} (nivel {nivel})\n\n"
+    respuesta += resultado_recomendaciones
+    respuesta += "\n\nINDICADORES SUGERIDOS:\n" + resultado_indicadores
+    respuesta += "\n\n¿Qué deseas hacer ahora?\n1. Resumen\n2. Análisis\n3. Recomendaciones generales\n4. Indicadores y recomendaciones específicas\n5. Salir"
+
+    historial = historial + [{'role': 'assistant', 'content': respuesta}]
+    return respuesta, historial
+
+
+def ejecutar_flujo_normal(
+    organizacion_id: str,
+    mensaje_usuario: str,
+    historial: List[Dict[str, Any]]
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    Flujo original con Claude (para preguntas libres, análisis complejos, etc.)
+    """
+    historial = historial + [{'role': 'user', 'content': mensaje_usuario}]
+
+    for turno in range(MAX_TURNOS):
+        try:
+            response = client.messages.create(
+                model=MODELO,
+                max_tokens=MAX_TOKENS,
+                system=SYSTEM_PROMPT,
+                tools=TOOLS,
+                messages=historial
+            )
+
+            if response.stop_reason == "end_turn":
+                texto = _extraer_texto_respuesta(response.content)
+                if not texto:
+                    texto = "He completado mi análisis. ¿Hay algo más en lo que pueda ayudarte?"
+                historial = historial + [{'role': 'assistant', 'content': texto}]
+                return texto, historial
+
+            elif response.stop_reason == "tool_use":
+                historial = historial + [{'role': 'assistant', 'content': response.content}]
+                resultados = []
+                for bloque in response.content:
+                    if bloque.type == "tool_use":
+                        try:
+                            resultado = ejecutar_tool(bloque.name, bloque.input)
+                            resultados.append({
+                                "type": "tool_result",
+                                "tool_use_id": bloque.id,
+                                "content": resultado
+                            })
+                        except Exception as e:
+                            resultados.append({
+                                "type": "tool_result",
+                                "tool_use_id": bloque.id,
+                                "content": f"Error: {str(e)}"
+                            })
+                if resultados:
+                    historial = historial + [{'role': 'user', 'content': resultados}]
+                    continue
+                else:
+                    texto = _extraer_texto_respuesta(response.content)
+                    if texto:
+                        historial = historial + [{'role': 'assistant', 'content': texto}]
+                        return texto, historial
+                    else:
+                        return "Necesito más información. ¿Puedes detallar tu pregunta?", historial
+
+        except Exception as e:
+            logger.error(f"Error en turno {turno}: {e}")
+            if turno == MAX_TURNOS - 1:
+                return f"Error: {str(e)}", historial
+            continue
+
+    return "Límite de iteraciones alcanzado. Reformula tu pregunta.", historial
 
 
 def ejecutar_agente(
@@ -30,257 +329,59 @@ def ejecutar_agente(
     historial: List[Dict[str, Any]]
 ) -> Tuple[str, List[Dict[str, Any]]]:
     """
-    Ejecuta el agente de sostenibilidad con manejo robusto de errores.
-    
-    Args:
-        organizacion_id: ID de la organización en Supabase
-        mensaje_usuario: Mensaje del usuario
-        historial: Historial de conversación anterior
-    
-    Returns:
-        Tuple con (respuesta_final, historial_actualizado)
+    Punto de entrada del agente.
+    Soporta menú interactivo (1-5), respuestas a submenús y preguntas libres.
     """
-    
     logger.info(f"=== INICIO AGENTE ===")
     logger.info(f"Organizacion: {organizacion_id}")
-    logger.info(f"Mensaje usuario: {mensaje_usuario[:100]}...")
-    logger.info(f"Longitud historial: {len(historial)} mensajes")
-    
-    # Limpiar historial si es muy largo (para no exceder tokens)
+    logger.info(f"Mensaje: {mensaje_usuario[:100]}...")
+    logger.info(f"Historial: {len(historial)} mensajes")
+
+    # Limpiar historial si es muy largo
     if len(historial) > MAX_HISTORIAL_MENSAJES:
-        logger.info(f"Historial largo ({len(historial)} mensajes), limpiando...")
         historial = limpiar_historial(historial, MAX_HISTORIAL_MENSAJES)
-    
+
     try:
-        # Validar que el mensaje no esté vacío
         if not mensaje_usuario or mensaje_usuario.strip() == "":
-            return "Por favor, escribe un mensaje para poder ayudarte.", historial
-        
-        # Agrega el mensaje del usuario al historial
-        historial = historial + [{'role': 'user', 'content': mensaje_usuario}]
-        
-        # Bucle principal del agente
-        for turno in range(MAX_TURNOS):
-            logger.info(f"Turno {turno + 1}/{MAX_TURNOS}")
-            
-            try:
-                # Llamar a Claude con el contexto actual
-                response = client.messages.create(
-                    model=MODELO,
-                    max_tokens=MAX_TOKENS,
-                    system=SYSTEM_PROMPT,
-                    tools=TOOLS,
-                    messages=historial
-                )
-                
-                logger.info(f"Stop reason: {response.stop_reason}")
-                logger.info(f"Contenido respuesta: {len(response.content)} bloques")
-                
-                # CASO 1: Claude terminó la respuesta
-                if response.stop_reason == "end_turn":
-                    texto_final = _extraer_texto_respuesta(response.content)
-                    
-                    if not texto_final:
-                        texto_final = "He completado mi analisis. Hay algo mas en lo que pueda ayudarte?"
-                    
-                    # Agregar respuesta al historial
-                    historial = historial + [{'role': 'assistant', 'content': texto_final}]
-                    
-                    logger.info(f"Respuesta final generada ({len(texto_final)} caracteres)")
-                    logger.info("=== FIN AGENTE (respuesta completa) ===")
-                    
-                    return texto_final, historial
-                
-                # CASO 2: Claude quiere usar herramientas
-                elif response.stop_reason == "tool_use":
-                    logger.info("Claude solicita usar herramientas")
-                    
-                    # Agregar la respuesta de Claude al historial
-                    historial = historial + [{'role': 'assistant', 'content': response.content}]
-                    
-                    # Ejecutar las herramientas solicitadas
-                    resultados = []
-                    for bloque in response.content:
-                        if bloque.type == "tool_use":
-                            logger.info(f"Ejecutando tool: {bloque.name}")
-                            logger.info(f"   Input: {bloque.input}")
-                            
-                            try:
-                                resultado = ejecutar_tool(bloque.name, bloque.input)
-                                logger.info(f"   Resultado: {str(resultado)[:100]}...")
-                                
-                                resultados.append({
-                                    "type": "tool_result",
-                                    "tool_use_id": bloque.id,
-                                    "content": resultado
-                                })
-                            except Exception as e:
-                                error_msg = f"Error ejecutando {bloque.name}: {str(e)}"
-                                logger.error(error_msg)
-                                resultados.append({
-                                    "type": "tool_result",
-                                    "tool_use_id": bloque.id,
-                                    "content": f"Error: {error_msg}. Por favor, intenta nuevamente."
-                                })
-                    
-                    # Agregar los resultados al historial
-                    if resultados:
-                        historial = historial + [{'role': 'user', 'content': resultados}]
-                        logger.info(f"{len(resultados)} herramientas ejecutadas, continuando...")
-                    
-                    # Continuar el bucle para que Claude procese los resultados
-                    continue
-                
-                # CASO 3: Otros tipos de stop (max_tokens, etc.)
-                else:
-                    logger.warning(f"Stop reason inesperado: {response.stop_reason}")
-                    texto_final = _extraer_texto_respuesta(response.content)
-                    if texto_final:
-                        historial = historial + [{'role': 'assistant', 'content': texto_final}]
-                        return texto_final, historial
-                    else:
-                        return "He procesado tu solicitud pero necesito mas informacion. Podrias detallar mas tu pregunta?", historial
-                        
-            except anthropic.APIError as e:
-                logger.error(f"Error de API de Anthropic: {e}")
-                return f"Hubo un problema de conexion con el servicio de IA. Por favor, intenta de nuevo en unos momentos. Error: {str(e)}", historial
-                
-            except anthropic.RateLimitError as e:
-                logger.error(f"Limite de tasa excedido: {e}")
-                return "El servicio esta recibiendo muchas solicitudes. Por favor, espera unos segundos y vuelve a intentarlo.", historial
-                
-            except anthropic.APIConnectionError as e:
-                logger.error(f"Error de conexion: {e}")
-                return "No se pudo conectar con el servicio de IA. Verifica tu conexion a internet e intenta nuevamente.", historial
-                
-            except Exception as e:
-                logger.error(f"Error inesperado en turno {turno}: {e}")
-                if turno == MAX_TURNOS - 1:
-                    return f"Ocurrio un error inesperado: {str(e)}. Por favor, intenta nuevamente.", historial
-                continue
-        
-        # Si llegamos aqui, se excedio el limite de turnos
-        logger.warning(f"Limite de {MAX_TURNOS} turnos alcanzado")
-        return "He realizado varias iteraciones para procesar tu solicitud. Para no extender demasiado la conversacion, podrias reformular tu pregunta o dividirla en partes mas pequenas?", historial
-        
+            return "Por favor, escribe un mensaje.", historial
+
+        mensaje_limpio = mensaje_usuario.strip()
+
+        # Verificar si es respuesta a un submenú (esperando dimensión para opción 4)
+        ultimo_msg_bot = None
+        for msg in reversed(historial):
+            if msg.get('role') == 'assistant':
+                ultimo_msg_bot = msg.get('content', '')
+                break
+
+        # Caso: estábamos esperando una dimensión para la opción 4
+        if ultimo_msg_bot and "Elige la dimensión para ver indicadores" in ultimo_msg_bot:
+            if mensaje_limpio.isdigit() and int(mensaje_limpio) in [2, 3, 4]:
+                dimension = f"D{int(mensaje_limpio)}"
+                return manejar_indicadores_por_dimension(organizacion_id, dimension, historial)
+
+        # Opción numérica del menú principal (1-5)
+        if re.match(r'^[1-5]$', mensaje_limpio) or mensaje_limpio.lower() in ['salir', 'exit']:
+            return manejar_opcion_numerica(organizacion_id, mensaje_limpio, historial)
+
+        # Si escribe directamente una dimensión (ej: "D4") como atajo
+        if re.match(r'^[Dd][1-5]$', mensaje_limpio):
+            return manejar_indicadores_por_dimension(organizacion_id, mensaje_limpio.upper(), historial)
+
+        # Flujo normal con Claude (preguntas libres)
+        return ejecutar_flujo_normal(organizacion_id, mensaje_usuario, historial)
+
     except Exception as e:
-        logger.error(f"Error critico en ejecutar_agente: {e}")
-        return f"Error inesperado en el agente: {str(e)}. Por favor, intenta nuevamente.", historial
+        logger.error(f"Error crítico: {e}")
+        return f"Error inesperado: {str(e)}", historial
 
 
-def _extraer_texto_respuesta(content: List[Any]) -> str:
-    """
-    Extrae el texto de la respuesta de Claude.
-    
-    Args:
-        content: Lista de bloques de contenido de Claude
-    
-    Returns:
-        Texto extraido o string vacio
-    """
-    texto = ""
-    for bloque in content:
-        if hasattr(bloque, 'text') and bloque.text:
-            texto += bloque.text
-        elif hasattr(bloque, 'type') and bloque.type == "text" and hasattr(bloque, 'text'):
-            texto += bloque.text
-    
-    return texto.strip()
-
-
-def formatear_respuesta_para_usuario(texto: str) -> str:
-    """
-    Funcion auxiliar para formatear respuestas antes de enviarlas al usuario.
-    Util para limpiar o mejorar el formato.
-    
-    Args:
-        texto: Texto de respuesta del agente
-    
-    Returns:
-        Texto formateado
-    """
-    # Eliminar espacios extras
-    texto = texto.strip()
-    
-    # Asegurar que no haya lineas vacias al inicio
-    if texto.startswith('\n'):
-        texto = texto[1:]
-    
-    # Asegurar que termine con punto o signo de pregunta
-    if texto and texto[-1] not in ['.', '?', '!', ':', ';']:
-        texto += '.'
-    
-    return texto
-
-
-def verificar_estado_agente() -> Dict[str, Any]:
-    """
-    Verifica que el agente este configurado correctamente.
-    Util para debugging.
-    
-    Returns:
-        Diccionario con estado del agente
-    """
-    estado = {
-        "modelo": MODELO,
-        "max_turnos": MAX_TURNOS,
-        "max_tokens": MAX_TOKENS,
-        "max_historial": MAX_HISTORIAL_MENSAJES,
-        "anthropic_key_configured": bool(os.getenv("ANTHROPIC_API_KEY")),
-        "tools_count": len(TOOLS),
-        "tools_names": [tool["name"] for tool in TOOLS],
-        "system_prompt_length": len(SYSTEM_PROMPT)
-    }
-    
-    # Verificar que el system prompt no este vacio
-    if not SYSTEM_PROMPT:
-        estado["warning"] = "SYSTEM_PROMPT esta vacio"
-    else:
-        estado["system_prompt_preview"] = SYSTEM_PROMPT[:200] + "..."
-    
-    return estado
-
-
-def limpiar_historial(historial: List[Dict[str, Any]], max_mensajes: int = 20) -> List[Dict[str, Any]]:
-    """
-    Limita el historial para no exceder tokens.
-    Mantiene los primeros mensajes (contexto) y los ultimos.
-    
-    Args:
-        historial: Historial completo
-        max_mensajes: Maximo numero de mensajes a mantener
-    
-    Returns:
-        Historial recortado
-    """
-    if len(historial) <= max_mensajes:
-        return historial
-    
-    # Mantener primeros 4 mensajes (contexto inicial)
-    # y ultimos (max_mensajes - 4) mensajes
-    primeros = historial[:4]
-    ultimos = historial[-(max_mensajes - 4):]
-    
-    return primeros + ultimos
-
+# ==========================
+# Punto de entrada para pruebas
+# ==========================
 
 if __name__ == "__main__":
-    print("=== VERIFICACION DEL AGENTE ===")
+    print("=== AGENTE IMGS-T ===")
     estado = verificar_estado_agente()
-    for key, value in estado.items():
-        print(f"{key}: {value}")
-    
-    print("\n" + "="*50)
-    
-    if estado["anthropic_key_configured"]:
-        print("\nEjecutando prueba simple...")
-        prueba_historial = []
-        respuesta, nuevo_historial = ejecutar_agente(
-            "test-id-123",
-            "Hola, soy una prueba. Que informacion necesitas para ayudarme?",
-            []
-        )
-        print(f"\nRespuesta:\n{respuesta}")
-        print(f"\nHistorial actualizado: {len(nuevo_historial)} mensajes")
-    else:
-        print("\nNo hay API key configurada. No se puede probar.")
+    for k, v in estado.items():
+        print(f"{k}: {v}")
