@@ -29,7 +29,7 @@ El objetivo es proveer un **agente de consultoría en sostenibilidad** dirigido 
 
 ---
 
-## 🏗️ Arquitectura (C4 Model)
+## 🏗️ Arquitectura
 
 A continuación se presenta el diagrama general de la arquitectura utilizando el estándar **C4 (Nivel de Contenedores)**:
 
