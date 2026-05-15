@@ -113,42 +113,4 @@ Chatbot/
 2. Configurar variables en un `.env` (como las claves de SUPABASE y ANTHROPIC_API_KEY).
 3. Iniciar servidor: `python main.py` o mediante uvicorn estándar.
 
-## Arquitectura cliente-servidor
-```mermaid
-flowchart LR
-
-    %% 1. Definición de la Capa Cliente
-    subgraph Cliente [🖥️ Capa Cliente]
-        ui[🌐 Interfaz de Usuario
-chat.html / Navegador]
-    end
-
-    %% 2. Definición de la Capa Servidor
-    subgraph Servidor [⚙️ Capa Servidor (Backend)]
-        api[⚡ API Server
-FastAPI]
-        
-        subgraph Logica_Interna [Cerebro del Agente]
-            agent[🧠 Core del Agente
-Lógica de IA]
-            tools[🛠️ Tool Executor
-Herramientas]
-        end
-    end
-
-    %% 3. Definición de Servicios Externos
-    subgraph Servicios_Externos [☁️ Servicios Externos]
-        claude[🤖 Claude API
-Anthropic]
-        db[(🗄️ Supabase
-PostgreSQL)]
-    end
-
-    %% 4. Conexiones (Estructura de la comunicación)
-    ui <-->|HTTP / WebSockets| api
-    api -->|Procesa peticiones| agent
-    agent <-->|Invoca herramientas| tools
-    agent <-->|Prompts y Respuestas| claude
-    tools <-->|Lectura / Escritura de datos| db
-```
 
