@@ -114,7 +114,7 @@ Chatbot/
 3. Iniciar servidor: `python main.py` o mediante uvicorn estándar.
 
 ## Diagrama arquitectura cliente-servidor
-
+```mermaid
 flowchart LR
 
     subgraph Cliente [🖥️ Capa Cliente]
@@ -145,4 +145,4 @@ flowchart LR
     %% Relaciones Servidor - Externos
     agent <-->|Prompts y Respuestas| claude
     tools <-->|Lectura / Escritura de datos| db
-
+```
