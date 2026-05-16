@@ -728,54 +728,76 @@ button{
 <body>
 
 <div class="app">
+<!-- SIDEBAR -->
 
-    <!-- SIDEBAR -->
+<aside class="sidebar">
 
-    <aside class="sidebar">
+    <div>
 
-        <div>
+        <div class="brand">
 
-            <div class="brand">
-
-                <div class="brand-logo">
-                    🌱
-                </div>
-
-                <div>
-
-                    <h1>IMGS-T Advisor</h1>
-
-                    <p>
-                        Sustainability Intelligence
-                    </p>
-
-                </div>
-
+            <div class="brand-logo">
+                🌱
             </div>
 
-        </div>
+            <div>
 
-        <div class="sidebar-footer">
-
-            <div class="status-card">
-
-                <div class="status-header">
-
-                    <div class="status-dot"></div>
-
-                    <h4>Sistema Operativo</h4>
-
-                </div>
+                <h1>IMGS-T Advisor</h1>
 
                 <p>
-                    Asistente inteligente conectado y disponible para análisis de sostenibilidad empresarial.
+                    Inteligencia de Sostenibilidad
                 </p>
 
             </div>
 
         </div>
 
-    </aside>
+    </div>
+
+    <div class="sidebar-footer">
+
+        <div class="status-card">
+
+            <div class="status-header">
+
+                <div class="status-dot"></div>
+
+                <h4>Asistente Inteligente</h4>
+
+            </div>
+
+            <p>
+                ¡Hola! 👋
+                A continuación, encontrarás la explicación de los niveles de madurez en sostenibilidad utilizados para evaluar el desempeño de tu organizacion.
+            </p>
+
+            <br>
+
+            <p>
+                <strong>Nivel 1 – Reactivo:</strong> Actúa solo ante problemas o crisis ambientales.
+            </p>
+
+            <p>
+                <strong>Nivel 2 – Inicial:</strong> Aplica prácticas básicas de sostenibilidad sin estructura definida.
+            </p>
+
+            <p>
+                <strong>Nivel 3 – Estructurado:</strong> Cuenta con procesos y responsables para la gestión sostenible.
+            </p>
+
+            <p>
+                <strong>Nivel 4 – Integrado:</strong> La sostenibilidad está integrada en la estrategia de la empresa.
+            </p>
+
+            <p>
+                <strong>Nivel 5 – Estratégico:</strong> Lidera con innovación y buenas prácticas sostenibles.
+            </p>
+
+        </div>
+
+    </div>
+
+</aside>
 
     <!-- MAIN -->
 
@@ -874,11 +896,14 @@ button{
 
                         <br><br>
 
-                        Asistente inteligente especializado en sostenibilidad empresarial y optimización ambiental para organizaciones del sector textil.
+                        ¡Hola! 👋
+                        Soy tu asistente inteligente, diseñado para ayudarte a mejorar la sostenibilidad empresarial y optimizar el impacto ambiental en organizaciones del sector textil. 
+                        Estoy aquí para brindarte apoyo, ideas y soluciones de manera fácil y práctica. 🌱🏭
+
 
                         <br><br>
 
-                        Establezca su ID para comenzar.
+                        Establece tu ID para comenzar.
 
                     </div>
 
@@ -975,9 +1000,9 @@ function setEmpresaId(){
     actualizarEstadoBoton();
 
     agregarMensaje(
-`✅ Organización conectada correctamente.
+`✅ Tu organización a sido conectada correctamente.
 
-¿Qué desea consultar?
+¿Qué te gustaria consultar?
 
 1. Ver resumen
 2. Ver análisis detallado
@@ -1004,7 +1029,7 @@ async function enviarMensaje(){
     if(organizacionId === null){
 
         alert(
-            'Primero conecte una organización'
+            'Recuerda conectar primero tu organización'
         );
 
         return;
@@ -1223,7 +1248,7 @@ function limpiarConversacion(){
                 Conversación reiniciada.
                 <br><br>
 
-                Conecte una nueva organización
+                Conecta una nueva organización
                 para continuar.
 
             </div>
@@ -1237,4 +1262,3 @@ function limpiarConversacion(){
 </body>
 
 </html>
-

@@ -113,7 +113,7 @@ DIAGNÓSTICO:
 {diagnostico_texto}
 """,
         "analisis": f"""
-Eres un consultor senior especializado en sostenibilidad para PyMEs textiles. Analiza el diagnóstico.
+Eres un consultor senior especializado en sostenibilidad para Pymes textiles. Analiza el diagnóstico.
 
 CLASIFICA OBLIGATORIAMENTE:
 1. Fortalezas (>=4.0)
@@ -126,7 +126,7 @@ IMPORTANTE:
 - Explica qué pasa si no mejoran
 
 FORMATO:
-ANALISIS DE DIAGNOSTICO
+ANALISIS 
 Fortalezas: ...
 Áreas de mejora: ...
 Brechas críticas: ...
@@ -199,28 +199,44 @@ def verificar_estado_agente() -> Dict[str, Any]:
 # ==========================
 
 def manejar_opcion_numerica(org_id: str, opcion: str, historial: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
-    """Maneja las opciones 1 a 5 del menú principal."""
+    """Maneja las opciones 1 a 5 del menú principal, con descripción previa."""
     diagnostico = obtener_diagnostico_cache(org_id)
     if not diagnostico:
         return "No se pudo obtener el diagnóstico. Verifica el ID.", historial
 
     if opcion == '1':
-        respuesta = generar_respuesta_ia("resumen", diagnostico)
+        # Descripción de qué es el resumen
+        descripcion = (
+            "📌 **Resumen de diagnóstico**: Te mostraré tu índice global, nivel de madurez "
+            "y los puntajes de las 5 dimensiones (D1 a D5). Es un vistazo rápido de tu situación.\n\n"
+        )
+        respuesta = descripcion + generar_respuesta_ia("resumen", diagnostico)
     elif opcion == '2':
-        respuesta = generar_respuesta_ia("analisis", diagnostico)
+        descripcion = (
+            "🔍 **Análisis detallado**: Voy a explicarte cuáles son tus fortalezas (puntajes altos) "
+            "y tus brechas (puntajes bajos). Para cada brecha, te daré una breve sugerencia de mejora.\n\n"
+        )
+        respuesta = descripcion + generar_respuesta_ia("analisis", diagnostico)
     elif opcion == '3':
-        respuesta = generar_respuesta_ia("recomendaciones", diagnostico)
+        descripcion = (
+            "💡 **Recomendaciones generales**: Basado en tu diagnóstico global, te propongo acciones prácticas "
+            "con costos y plazos aproximados. No necesitas elegir una dimensión específica.\n\n"
+        )
+        respuesta = descripcion + generar_respuesta_ia("recomendaciones", diagnostico)
     elif opcion == '4':
-        respuesta = (
-            "Elige la dimensión para ver indicadores y recomendaciones específicas:\n"
+        # Aquí solo mostramos el submenú, pero podemos añadir una breve explicación
+        descripcion = (
+            "🎯 **Indicadores y recomendaciones específicas**: Puedes elegir una dimensión (D2, D3 o D4) "
+            "y recibirás acciones concretas más los indicadores clave para medir tu mejora.\n\n"
+            "Elige la dimensión:\n"
             "2. D2 - Dimensión Económica\n"
             "3. D3 - Dimensión Social\n"
             "4. D4 - Dimensión Ambiental"
         )
-        historial = historial + [{'role': 'assistant', 'content': respuesta}]
-        return respuesta, historial
+        historial = historial + [{'role': 'assistant', 'content': descripcion}]
+        return descripcion, historial
     elif opcion == '5' or opcion.lower() == 'salir':
-        respuesta = "Sesión finalizada. Gracias por usar IMGS-T Advisor. Para comenzar de nuevo, establece un ID de empresa."
+        respuesta = "👋 Sesión finalizada. Gracias por usar IMGS-T Advisor. Para comenzar de nuevo, establece un ID de empresa."
         return respuesta, []
     else:
         respuesta = "Opción no válida. Elige 1,2,3,4 o 5."
@@ -233,8 +249,10 @@ def manejar_opcion_numerica(org_id: str, opcion: str, historial: List[Dict[str, 
     return respuesta, historial
 
 
+
+
 def manejar_indicadores_por_dimension(org_id: str, dimension: str, historial: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
-    """Opción 4: entrega recomendaciones específicas + indicadores para D2, D3 o D4."""
+    """Opción 4: entrega recomendaciones específicas + indicadores para D2, D3 o D4, con descripción previa."""
     diagnostico = obtener_diagnostico_cache(org_id)
     if not diagnostico:
         return "No se pudo obtener el diagnóstico.", historial
@@ -245,13 +263,27 @@ def manejar_indicadores_por_dimension(org_id: str, dimension: str, historial: Li
         historial = historial + [{'role': 'assistant', 'content': respuesta, 'esperando_nivel': True, 'dim_indicador': dimension}]
         return respuesta, historial
 
-    # Obtener recomendaciones e indicadores
+    # Descripción personalizada según la dimensión elegida
+    if dimension == "D2":
+        nombre_dim = "Económica (finanzas y cadena de valor)"
+    elif dimension == "D3":
+        nombre_dim = "Social (trabajadores y comunidad)"
+    elif dimension == "D4":
+        nombre_dim = "Ambiental (agua, energía, residuos)"
+    else:
+        nombre_dim = dimension
+
+    descripcion = (
+        f"📊 **Recomendaciones e indicadores para {dimension} - {nombre_dim}** (nivel {nivel})\n"
+        "Primero te daré acciones concretas que puedes aplicar. Al final, te mostraré los indicadores clave "
+        "para que puedas medir tu progreso.\n\n"
+    )
+
     resultado_recomendaciones = ejecutar_tool('buscar_recomendaciones', {'dimension': dimension, 'nivel_actual': nivel})
     resultado_indicadores = ejecutar_tool('sugerir_indicadores', {'dimension': dimension, 'nivel_actual': nivel, 'solo_gestion': True})
 
-    respuesta = f"RECOMENDACIONES ESPECÍFICAS E INDICADORES PARA {dimension} (nivel {nivel})\n\n"
-    respuesta += resultado_recomendaciones
-    respuesta += "\n\nINDICADORES SUGERIDOS:\n" + resultado_indicadores
+    respuesta = descripcion + resultado_recomendaciones
+    respuesta += "\n\n📈 **Indicadores sugeridos:**\n" + resultado_indicadores
     respuesta += "\n\n¿Qué deseas hacer ahora?\n1. Resumen\n2. Análisis\n3. Recomendaciones generales\n4. Indicadores y recomendaciones específicas\n5. Salir"
 
     historial = historial + [{'role': 'assistant', 'content': respuesta}]

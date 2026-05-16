@@ -7,26 +7,35 @@ Este proyecto provee un agente de IA para consultoría en sostenibilidad dirigid
 A continuación se presenta el diagrama general de la arquitectura utilizando el estándar C4 (Nivel de Contenedores).
 
 ```mermaid
-C4Context
-    title Nivel de Contenedores - Agente IMGS-T
+flowchart LR
 
-    Person(user, "Usuario / Frontend", "Interactúa mediante la interfaz de chat (HTML) o la aplicación principal (Tesis 1).")
+    %% 1. Definición de la Capa Cliente
+    subgraph Cliente [🖥️ Capa Cliente]
+        ui[🌐 Interfaz de Usuario<br>chat.html / Navegador]
+    end
 
-    System_Boundary(c1, "Sistema Agente IMGS-T") {
-        Container(api, "API Server", "Python / FastAPI", "Provee endpoints REST (/chat, /analizar, /estado). Gestiona las peticiones HTTP y Middlewares.")
-        Container(agent, "Core del Agente", "Python", "Controla el bucle de razonamiento de la IA, historial y parseo de peticiones.")
-        Container(tools, "Tool Executor", "Python", "Ejecuta las acciones o 'herramientas' que la IA decide usar.")
-    }
+    %% 2. Definición de la Capa Servidor
+    subgraph Servidor [⚙️ Capa Servidor (Backend)]
+        api[⚡ API Server<br>FastAPI]
+        
+        subgraph Logica_Interna [Cerebro del Agente]
+            agent[🧠 Core del Agente<br>Lógica de IA]
+            tools[🛠️ Tool Executor<br>Herramientas]
+        end
+    end
 
-    SystemDb_Ext(supabase, "Base de Datos", "Supabase / PostgreSQL", "Guarda empresas, respuestas del diagnóstico, niveles de madurez y planes de acción.")
-    System_Ext(claude, "Motor LLM", "Anthropic Claude API", "Infiere respuestas y decide cuándo consultar herramientas locales.")
+    %% 3. Definición de Servicios Externos
+    subgraph Servicios_Externos [☁️ Servicios Externos]
+        claude[🤖 Claude API<br>Anthropic]
+        db[(🗄️ Supabase<br>PostgreSQL)]
+    end
 
-    Rel(user, api, "Llama a los endpoints", "HTTPS/JSON")
-    Rel(api, agent, "Delega la conversación o análisis de diagnóstico", "Llamada Python")
-    Rel(agent, claude, "Envía contexto, prompts y herramientas disponibles", "API HTTP")
-    Rel(claude, agent, "Devuelve texto o peticiones de uso de herramientas (Tool calls)", "JSON")
-    Rel(agent, tools, "Enruta la ejecución si el modelo pide una herramienta", "Llamada Python")
-    Rel(tools, supabase, "Consulta DB: obtener_diagnostico, guardar_plan_accion...", "PostgREST API")
+    %% 4. Conexiones (Estructura de la comunicación)
+    ui <-->|HTTP / WebSockets| api
+    api -->|Procesa peticiones| agent
+    agent <-->|Invoca herramientas| tools
+    agent <-->|Prompts y Respuestas| claude
+    tools <-->|Lectura / Escritura de datos| db
 ```
 
 ### Componentes Principales

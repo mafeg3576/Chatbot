@@ -36,23 +36,33 @@ A continuación se presenta el diagrama general de la arquitectura utilizando el
 ```mermaid
 flowchart LR
 
-    user[👤 Usuario / Frontend]
-
-    subgraph Sistema_Agente_IMGS_T
-        api[⚡ API Server<br>FastAPI]
-        agent[🧠 Core del Agente<br>Lógica de IA]
-        tools[🛠️ Tool Executor<br>Herramientas]
+    %% 1. Definición de la Capa Cliente
+    subgraph Cliente [🖥️ Capa Cliente]
+        ui[🌐 Interfaz de Usuario<br>chat.html / Navegador]
     end
 
-    claude[🤖 Claude API<br>Motor LLM]
-    db[(🗄️ Supabase<br>PostgreSQL)]
+    %% 2. Definición de la Capa Servidor
+    subgraph Servidor [⚙️ Capa Servidor (Backend)]
+        api[⚡ API Server<br>FastAPI]
+        
+        subgraph Logica_Interna [Cerebro del Agente]
+            agent[🧠 Core del Agente<br>Lógica de IA]
+            tools[🛠️ Tool Executor<br>Herramientas]
+        end
+    end
 
-    user -->|HTTP / JSON| api
-    api -->|Procesa solicitudes| agent
-    agent -->|Envía prompts| claude
-    claude -->|Respuestas| agent
-    agent -->|Tool calls| tools
-    tools -->|Consultas DB| db
+    %% 3. Definición de Servicios Externos
+    subgraph Servicios_Externos [☁️ Servicios Externos]
+        claude[🤖 Claude API<br>Anthropic]
+        db[(🗄️ Supabase<br>PostgreSQL)]
+    end
+
+    %% 4. Conexiones (Estructura de la comunicación)
+    ui <-->|HTTP / WebSockets| api
+    api -->|Procesa peticiones| agent
+    agent <-->|Invoca herramientas| tools
+    agent <-->|Prompts y Respuestas| claude
+    tools <-->|Lectura / Escritura de datos| db
 ```
 
 ### Explicacion del diagrama
