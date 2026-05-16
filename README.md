@@ -29,7 +29,7 @@ El objetivo es proveer un **agente de consultoría en sostenibilidad** dirigido 
 
 ---
 
-## 🏗️ Arquitectura (C4 Model)
+## 🏗️ Arquitectura
 
 A continuación se presenta el diagrama general de la arquitectura utilizando el estándar **C4 (Nivel de Contenedores)**:
 
@@ -122,3 +122,5 @@ Chatbot/
 1. Instalar requerimientos: `pip install -r requirements.txt`
 2. Configurar variables en un `.env` (como las claves de SUPABASE y ANTHROPIC_API_KEY).
 3. Iniciar servidor: `python main.py` o mediante uvicorn estándar.
+
+
