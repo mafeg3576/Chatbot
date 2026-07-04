@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -158,6 +157,10 @@ async def root():
         "tools_lista": [tool["name"] for tool in TOOLS],
         "timestamp": datetime.now().isoformat()
     }
+
+@app.get("/chat", response_class=FileResponse)
+async def chat_interface():
+    return FileResponse("chat.html")
 
 
 @app.get(
